@@ -1,0 +1,61 @@
+
+services:
+  ai-monitoring-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai
+    container_name: ai-monitoring-service
+    ports:
+      - "8000:8000"  # Metrics
+      - "8081:8081"  # API
+    environment:
+      - PROMETHEUS_URL=http://54.179.129.166:9090
+      - GRAFANA_URL=http://54.179.129.166:3000
+      - MONITORING_INTERVAL=30
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./logs:/app/logs
+      - ./models:/app/models
+      - ./data:/app/data
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - ai-monitoring
+
+  redis:
+    image: redis:7-alpine
+    container_name: ai-monitoring-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - ai-monitoring
+
+  postgres:
+    image: postgres:15
+    container_name: ai-monitoring-db
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - ai-monitoring
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  ai-monitoring:
+    driver: bridge
